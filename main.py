@@ -1,16 +1,17 @@
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import discord
 from discord.ext import commands
 import os
-from dotenv import load_dotenv  # Adicione esta linha
+from dotenv import load_dotenv  
 import asyncio
 
 # Carrega variáveis do .env
-load_dotenv()  # Adicione esta linha
+load_dotenv()  
 
 # Configurações
-TOKEN = os.getenv('DISCORD_TOKEN')  # Alterado para os.getenv()
-PREFIXO = os.getenv('PREFIXO', '-')  # Prefixo padrão caso não exista
-GUILD_ID = int(os.getenv('GUILD_ID', 0))  # ID do servidor
+TOKEN = os.getenv('DISCORD_TOKEN')  
+PREFIXO = os.getenv('PREFIXO', '-')  
+GUILD_ID = int(os.getenv('GUILD_ID', 0))  
 
 intents = discord.Intents.default()
 intents.message_content = True
