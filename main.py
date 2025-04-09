@@ -1,10 +1,10 @@
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv  
 import asyncio
 
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Carrega variáveis do .env
 load_dotenv()  
 
