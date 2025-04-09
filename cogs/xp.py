@@ -7,7 +7,7 @@ import json
 class XP(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = os.getenv('DB_PATH', 'xp.db')
+        self.db_path = os.getenv('DB_PATH', 'data/xp.db')
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
         self._create_tables()
