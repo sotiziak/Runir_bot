@@ -27,21 +27,20 @@ class Dados(commands.Cog):
             if parte in '+-*/':
             operador = parte
             continue
+            if 'd' in parte:  # Dice roll
+            qtd, faces = map(int, parte.split('d'))
+            resultados = [random.randint(1, faces) for _ in range(qtd)]
+            subtotal = sum(resultados)
+            texto = f"{qtd}d{faces}"
 
-        if 'd' in parte:  # Dice roll
-        qtd, faces = map(int, parte.split('d'))
-        resultados = [random.randint(1, faces) for _ in range(qtd)]
-        subtotal = sum(resultados)
-        texto = f"{qtd}d{faces}"
-
-        if operador == '*':
-            total *= subtotal
-        elif operador == '/':
-            total /= subtotal
-        elif operador == '-':
-            total -= subtotal
-        else:
-            total += subtotal
+            if operador == '*':
+                total *= subtotal
+            elif operador == '/':
+                total /= subtotal
+            elif operador == '-':
+                total -= subtotal
+            else:
+                total += subtotal
 
         componentes.append(f"🎯 {texto}\n`{' '.join(map(str, resultados))}` = `{subtotal}`")
     else:  # Modifier
