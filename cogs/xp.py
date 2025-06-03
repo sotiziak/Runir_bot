@@ -3,6 +3,7 @@ from discord.ext import commands
 import sqlite3
 import os
 import json
+import math
 
 class XP(commands.Cog):
     def __init__(self, bot):
@@ -64,6 +65,32 @@ class XP(commands.Cog):
         return 1
 
     @commands.command()
+    async def ranking(self, ctx, page: int = 1):
+        """Exibe o ranking de todos os usuários com XP, paginado."""
+        per_page = 10
+        offset = (page - 1) * per_page
+
+        self.cursor.execute("SELECT user_id, xp FROM users ORDER BY xp DESC LIMIT ? OFFSET ?", (per_page, offset))
+        users = self.cursor.fetchall()
+
+        if not users:
+            await ctx.send(f"📜 Não há usuários nesta página do ranking!")
+            return
+
+        total_users = self.cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        total_pages = math.ceil(total_users / per_page)
+
+        embed = discord.Embed(title=f"🏆 Ranking XP - Página {page}/{total_pages}", color=discord.Color.gold())
+
+        for i, (user_id, xp) in enumerate(users, start=offset + 1):
+            member = ctx.guild.get_member(user_id)
+            username = member.display_name if member else f"Usuário desconhecido ({user_id})"
+            embed.add_field(name=f"#{i} {username}", value=f"XP: {xp}", inline=False)
+
+        embed.set_footer(text="Use !ranking <número da página> para navegar.")
+        await ctx.send(embed=embed)
+
+    @commands.command()
     async def xp(self, ctx, usuario: discord.Member = None):
         """Mostra XP e nível"""
         alvo = usuario or ctx.author
@@ -86,48 +113,32 @@ class XP(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command()
-    async def ranking(self, ctx):
-        """Mostra o top 10 de XP"""
-        self.cursor.execute('SELECT user_id, xp FROM users ORDER BY xp DESC LIMIT 10')
-        ranking = self.cursor.fetchall()
-        embed = discord.Embed(title="🏅 Ranking de XP", color=0xffd700)
-        for posicao, (user_id, xp) in enumerate(ranking, start=1):
-            user = await self.bot.fetch_user(user_id)
-            nivel = self.calcular_nivel(xp)
-            embed.add_field(
-                name=f"{posicao}º - {user.display_name}",
-                value=f"`Nível {nivel} | {xp} XP`",
-                inline=False
-            )
-        if not embed.fields:
-            embed.description = "Ninguém possui XP registrado ainda!"
-        await ctx.send(embed=embed)
+    async def xpadd(self, ctx, target: discord.Role, quantidade: int):
+        """Adiciona XP para todos os usuários que possuem um cargo (@Role)."""
+        if isinstance(target, discord.Role):
+            membros = [m for m in ctx.guild.members if target in m.roles]
 
-    @commands.command()
-    async def xpadd(self, ctx, usuario: discord.Member, quantidade: int):
-        """Adiciona XP"""
-        if not await self.verificar_permissao(ctx):
-            return
-        self.cursor.execute('''
-            INSERT INTO users (user_id, xp) 
-            VALUES (?, COALESCE((SELECT xp FROM users WHERE user_id = ?), 0) + ?)
-            ON CONFLICT(user_id) DO UPDATE SET xp = xp + ?
-        ''', (usuario.id, usuario.id, quantidade, quantidade))
-        self.conn.commit()
-        nivel_antigo = self.calcular_nivel(self.cursor.execute('SELECT xp FROM users WHERE user_id = ?', (usuario.id,)).fetchone()[0] - quantidade)
-        nivel_novo = self.calcular_nivel(self.cursor.execute('SELECT xp FROM users WHERE user_id = ?', (usuario.id,)).fetchone()[0])
-        await ctx.send(f"✅ {quantidade} XP adicionados para {usuario.mention}")
-        if nivel_novo > nivel_antigo:
-            await ctx.send(f"🎉 {usuario.mention} subiu para o nível {nivel_novo}!")
+            if not membros:
+                await ctx.send(f"❌ Nenhum membro encontrado com o cargo {target.mention}.")
+                return
+
+            for membro in membros:
+                self.cursor.execute("UPDATE users SET xp = xp + ? WHERE user_id = ?", (quantidade, membro.id))
+
+            self.conn.commit()
+            await ctx.send(f"✅ {quantidade} XP adicionados para **{len(membros)}** membros com o cargo {target.mention}.")
+        else:
+            usuario = target
+            self.cursor.execute("UPDATE users SET xp = xp + ? WHERE user_id = ?", (quantidade, usuario.id))
+            self.conn.commit()
+            await ctx.send(f"✅ {quantidade} XP adicionados para {usuario.mention}.")
 
     @commands.command()
     async def xpremove(self, ctx, usuario: discord.Member, quantidade: int):
         """Remove XP"""
         if not await self.verificar_permissao(ctx):
             return
-        self.cursor.execute('''
-            UPDATE users SET xp = MAX(0, xp - ?) WHERE user_id = ?
-        ''', (quantidade, usuario.id))
+        self.cursor.execute('UPDATE users SET xp = MAX(0, xp - ?) WHERE user_id = ?', (quantidade, usuario.id))
         self.conn.commit()
         await ctx.send(f"✅ {quantidade} XP removidos de {usuario.mention}")
 

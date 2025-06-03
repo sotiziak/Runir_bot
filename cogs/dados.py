@@ -8,46 +8,47 @@ class Dados(commands.Cog):
 
     @commands.command(name='r', aliases=['roll'])
     async def rolar(self, ctx, *, expressao: str = "d20"):
-        """Rola dados (formato: [X]dY±Z ou dY±Z)"""
+        """Rola dados (formato: [X]dY±Z ou dY±Z, suporta múltiplos dados e operações matemáticas)"""
         try:
             expressao = expressao.replace(" ", "").lower()
             if expressao.startswith('d'):
-                expressao = '1' + expressao
+                expressao = '1' + expressao  
 
             if not re.match(r'^(\d*d\d+([k|kl]\d+)?([*/+-]\d*d\d+|[*/+-]\d+)*)$', expressao):
-                await ctx.send("❌ Formato inválido! Exemplos:\n`-r d20`\n`-r d20+3`\n`-r 2d20k1`")
+                await ctx.send("❌ Formato inválido! Exemplos:\n`-r d20`\n`-r 2d20+3`\n`-r 1d10+1d4`\n`-r 2d6*2`")
                 return
 
             total = 0
             componentes = []
-            partes = re.findall(r'\d*d\d+|[*/+-]\d+', expressao)  
-
+            partes = re.findall(r'\d*d\d+|[*/+-]\d+', expressao) 
             operador = '+'
+
             for parte in partes:
-            if parte in '+-*/':
-            operador = parte
-            continue
-            if 'd' in parte:  # Dice roll
-            qtd, faces = map(int, parte.split('d'))
-            resultados = [random.randint(1, faces) for _ in range(qtd)]
-            subtotal = sum(resultados)
-            texto = f"{qtd}d{faces}"
+                if parte in '+-*/':
+                    operador = parte
+                    continue
 
-            if operador == '*':
-                total *= subtotal
-            elif operador == '/':
-                total /= subtotal
-            elif operador == '-':
-                total -= subtotal
-            else:
-                total += subtotal
+                if 'd' in parte: 
+                    qtd, faces = map(int, parte.split('d')) if 'd' in parte else (1, int(parte))
+                    resultados = [random.randint(1, faces) for _ in range(qtd)]
+                    subtotal = sum(resultados)
+                    texto = f"{qtd}d{faces}"
 
-        componentes.append(f"🎯 {texto}\n`{' '.join(map(str, resultados))}` = `{subtotal}`")
-    else:  # Modifier
-        valor = int(parte)
-        total = eval(f"{total}{operador}{valor}")
-        componentes.append(f"📝 Modificador `{operador}{valor}`")
-                    total += valor if operador == '+' else -valor
+                    if operador == '*':
+                        total *= subtotal
+                    elif operador == '/':
+                        total /= subtotal
+                    elif operador == '-':
+                        total -= subtotal
+                    else:
+                        total += subtotal
+
+                    componentes.append(f"🎲 {texto} → `{resultados}` → **{subtotal}**")
+
+                else:  
+                    valor = int(parte)
+                    total = eval(f"{total}{operador}{valor}")
+                    componentes.append(f"📝 Modificador `{operador}{valor}`")
 
             resposta = [
                 f"{ctx.author.mention} rolou:",
@@ -57,11 +58,11 @@ class Dados(commands.Cog):
             ]
 
             if 'd20' in expressao.lower():
-                resultados_verificacao = selecionados if isinstance(selecionados, list) else [selecionados]
-                if 20 in resultados_verificacao:
+                if 20 in resultados:
                     resposta.append("💥 **Crítico!**")
-                if 1 in resultados_verificacao:
+                if 1 in resultados:
                     resposta.append("💀 **Falha!**")
+
             await ctx.send('\n'.join(resposta))
 
         except Exception as e:
