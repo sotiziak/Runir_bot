@@ -64,6 +64,25 @@ class XP(commands.Cog):
                 return nivel
         return 1
 
+class RankingView(discord.ui.View):
+    def __init__(self, bot, page=1):
+        super().__init__()
+        self.bot = bot
+        self.page = page
+
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.gray)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page -= 1
+        await self.update_ranking(interaction)
+
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.gray)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page += 1
+        await self.update_ranking(interaction)
+
+    async def update_ranking(self, interaction):
+        await XP.ranking(self.bot, interaction, page=self.page)
+
     @commands.command()
     async def ranking(self, ctx, page: int = 1):
         """Exibe o ranking de todos os usuários com XP, paginado."""
@@ -84,11 +103,17 @@ class XP(commands.Cog):
 
         for i, (user_id, xp) in enumerate(users, start=offset + 1):
             member = ctx.guild.get_member(user_id)
-            username = member.display_name if member else f"Usuário desconhecido ({user_id})"
+            if member:
+                username = member.display_name
+            else:
+                user_data = await self.bot.fetch_user(user_id)  # Busca o nome pela API do Discord
+                username = user_data.name if user_data else f"Usuário desconhecido ({user_id})"
             embed.add_field(name=f"#{i} {username}", value=f"XP: {xp}", inline=False)
 
         embed.set_footer(text="Use !ranking <número da página> para navegar.")
         await ctx.send(embed=embed)
+        view = RankingView(self.bot, page)
+        await ctx.send(embed=embed, view=view)
 
     @commands.command()
     async def xp(self, ctx, usuario: discord.Member = None):
