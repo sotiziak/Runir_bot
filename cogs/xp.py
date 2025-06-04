@@ -64,28 +64,9 @@ class XP(commands.Cog):
                 return nivel
         return 1
 
-class RankingView(discord.ui.View):
-    def __init__(self, bot, page=1):
-        super().__init__()
-        self.bot = bot
-        self.page = page
-
-    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.gray)
-    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.page -= 1
-        await self.update_ranking(interaction)
-
-    @discord.ui.button(label="➡️", style=discord.ButtonStyle.gray)
-    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.page += 1
-        await self.update_ranking(interaction)
-
-    async def update_ranking(self, interaction):
-        await XP.ranking(self.bot, interaction, page=self.page)
-
     @commands.command()
     async def ranking(self, ctx, page: int = 1):
-        """Exibe o ranking de todos os usuários com XP, paginado."""
+        """Exibe o ranking de todos os usuários com XP, paginado e com botões."""
         per_page = 10
         offset = (page - 1) * per_page
 
@@ -106,74 +87,34 @@ class RankingView(discord.ui.View):
             if member:
                 username = member.display_name
             else:
-                user_data = await self.bot.fetch_user(user_id)  # Busca o nome pela API do Discord
-                username = user_data.name if user_data else f"Usuário desconhecido ({user_id})"
+                try:
+                    user_data = await self.bot.fetch_user(user_id)
+                    username = user_data.name if user_data else f"Usuário desconhecido ({user_id})"
+                except:
+                    username = f"Usuário desconhecido ({user_id})"
+            
             embed.add_field(name=f"#{i} {username}", value=f"XP: {xp}", inline=False)
 
-        embed.set_footer(text="Use !ranking <número da página> para navegar.")
-        await ctx.send(embed=embed)
+        embed.set_footer(text="Use as setas ⬅️➡️ para navegar.")
         view = RankingView(self.bot, page)
         await ctx.send(embed=embed, view=view)
 
-    @commands.command()
-    async def xp(self, ctx, usuario: discord.Member = None):
-        """Mostra XP e nível"""
-        alvo = usuario or ctx.author
-        self.cursor.execute('SELECT xp FROM users WHERE user_id = ?', (alvo.id,))
-        resultado = self.cursor.fetchone()
-        xp = resultado[0] if resultado else 0
-        nivel = self.calcular_nivel(xp)
-        xp_proximo = self.TABELA_NIVEIS.get(nivel + 1, 0)
-        progresso = xp - self.TABELA_NIVEIS[nivel]
-        necessario = xp_proximo - self.TABELA_NIVEIS[nivel] if nivel < 15 else 0
+class RankingView(discord.ui.View):
+    def __init__(self, bot, page=1):
+        super().__init__()
+        self.bot = bot
+        self.page = page
 
-        embed = discord.Embed(title=f"🏆 Nível {nivel} | {alvo.display_name}", color=0x00ff00)
-        embed.add_field(name="XP Total", value=f"`{xp}`", inline=True)
-        if nivel < 15:
-            embed.add_field(name="Próximo Nível", value=f"`{xp_proximo} XP`", inline=True)
-            embed.add_field(name="Progresso", value=f"`{progresso}/{necessario}` ({progresso/necessario:.0%})", inline=False)
-        else:
-            embed.add_field(name="🎯 Status", value="Nível Máximo Alcançado!", inline=True)
-        embed.set_thumbnail(url=alvo.display_avatar.url)
-        await ctx.send(embed=embed)
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.gray)
+    async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page > 1:
+            self.page -= 1
+            await XP.ranking(self.bot, interaction, page=self.page)
 
-    @commands.command()
-    async def xpadd(self, ctx, target: discord.Role, quantidade: int):
-        """Adiciona XP para todos os usuários que possuem um cargo (@Role)."""
-        if isinstance(target, discord.Role):
-            membros = [m for m in ctx.guild.members if target in m.roles]
-
-            if not membros:
-                await ctx.send(f"❌ Nenhum membro encontrado com o cargo {target.mention}.")
-                return
-
-            for membro in membros:
-                self.cursor.execute("UPDATE users SET xp = xp + ? WHERE user_id = ?", (quantidade, membro.id))
-
-            self.conn.commit()
-            await ctx.send(f"✅ {quantidade} XP adicionados para **{len(membros)}** membros com o cargo {target.mention}.")
-        else:
-            usuario = target
-            self.cursor.execute("UPDATE users SET xp = xp + ? WHERE user_id = ?", (quantidade, usuario.id))
-            self.conn.commit()
-            await ctx.send(f"✅ {quantidade} XP adicionados para {usuario.mention}.")
-
-    @commands.command()
-    async def xpremove(self, ctx, usuario: discord.Member, quantidade: int):
-        """Remove XP"""
-        if not await self.verificar_permissao(ctx):
-            return
-        self.cursor.execute('UPDATE users SET xp = MAX(0, xp - ?) WHERE user_id = ?', (quantidade, usuario.id))
-        self.conn.commit()
-        await ctx.send(f"✅ {quantidade} XP removidos de {usuario.mention}")
-
-    @commands.command()
-    @commands.has_permissions(administrator=True)
-    async def xpreset(self, ctx, usuario: discord.Member):
-        """Reseta XP"""
-        self.cursor.execute('DELETE FROM users WHERE user_id = ?', (usuario.id,))
-        self.conn.commit()
-        await ctx.send(f"✅ XP de {usuario.mention} foi resetado!")
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.gray)
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.page += 1
+        await XP.ranking(self.bot, interaction, page=self.page)
 
 async def setup(bot):
     await bot.add_cog(XP(bot))
