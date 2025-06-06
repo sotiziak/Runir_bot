@@ -7,28 +7,36 @@ class Dados(commands.Cog):
         self.bot = bot
 
     def processar_dados(self, expressao):
-        """Processa rolagens como '1d10+1d4' corretamente"""
-        partes = re.findall(r'(\d*)d(\d+)', expressao)  # Captura todas rolagens de dados
+        """Processa rolagens com o 'k'"""
+        partes = re.findall(r'(\d*)d(\d+)(k[lh]?\d+)?', expressao)  
         resultados = []
 
-        for quantidade, faces in partes:
-            quantidade = int(quantidade) if quantidade else 1  # Assume "d20" como "1d20"
+        for quantidade, faces, keep in partes:
+            quantidade = int(quantidade) if quantidade else 1  
             faces = int(faces)
             valores_rolados = [random.randint(1, faces) for _ in range(quantidade)]
-            resultados.append((f"{quantidade}d{faces}", valores_rolados, sum(valores_rolados)))
+
+            if keep:  
+                tipo = 'h' if 'h' in keep else 'l'
+                num_keep = int(re.findall(r'\d+', keep)[0])
+                valores_filtrados = sorted(valores_rolados, reverse=(tipo == 'h'))[:num_keep]
+            else:
+                valores_filtrados = valores_rolados
+
+            resultados.append((f"{quantidade}d{faces}{keep if keep else ''}", valores_rolados, valores_filtrados, sum(valores_filtrados)))
 
         return resultados
 
     @commands.command(name='r', aliases=['roll'])
     async def rolar(self, ctx, *, expressao: str = "d20"):
-        """Rola dados (exemplo: '2d20+3', '1d10+1d4', '2d6*2')"""
+        """Rola dados (exemplo: '2d20+3', '2d4k1', '2d6*2')"""
         try:
             expressao = expressao.replace(" ", "").lower()
             if expressao.startswith('d'):
                 expressao = '1' + expressao  
 
-            if not re.match(r'^(\d*d\d+([*/+-]\d*d\d+|[*/+-]\d+)*)$', expressao):
-                await ctx.send("❌ Formato inválido! Exemplos:\n`-r d20`\n`-r 2d20+3`\n`-r 1d10+1d4`\n`-r 2d6*2`")
+            if not re.match(r'^(\d*d\d+([*/+-]\d*d\d+|[*/+-]\d+)*(k[lh]?\d+)*)$', expressao):
+                await ctx.send("❌ Formato inválido! Exemplos:\n`-r d20`\n`-r 2d20+3`\n`-r 2d4k1`\n`-r 2d6*2`")
                 return
 
             total = 0
@@ -36,8 +44,8 @@ class Dados(commands.Cog):
             operador = '+'
             dados_rolados = self.processar_dados(expressao)
             
-            for texto, valores, subtotal in dados_rolados:
-                componentes.append(f"🎲 {texto} → `{valores}` → **{subtotal}**")
+            for texto, valores, filtrados, subtotal in dados_rolados:
+                componentes.append(f"🎲 {texto} → `{valores}` → **Usando: {filtrados}** → **Total: {subtotal}**")
                 total += subtotal
 
             modificadores = re.findall(r'([*/+-]\d+)', expressao)

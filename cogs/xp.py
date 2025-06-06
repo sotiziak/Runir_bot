@@ -58,7 +58,7 @@ class XP(commands.Cog):
     }
 
     def calcular_nivel(self, xp):
-        """Calcula o nível baseado na tabela"""
+        """Calcula o nível baseado na tabela."""
         for nivel, xp_necessario in sorted(self.TABELA_NIVEIS.items(), reverse=True):
             if xp >= xp_necessario:
                 return nivel
@@ -66,7 +66,7 @@ class XP(commands.Cog):
 
     @commands.command()
     async def ranking(self, ctx, page: int = 1):
-        """Exibe o ranking de todos os usuários com XP, paginado e com botões."""
+        """Exibe o ranking de todos os usuários com XP."""
         per_page = 10
         offset = (page - 1) * per_page
 
@@ -98,6 +98,29 @@ class XP(commands.Cog):
         embed.set_footer(text="Use as setas ⬅️➡️ para navegar.")
         view = RankingView(self.bot, page)
         await ctx.send(embed=embed, view=view)
+
+    @commands.command()
+    async def xp(self, ctx, usuario: discord.Member = None):
+        """Mostra XP e nível."""
+        alvo = usuario or ctx.author
+        self.cursor.execute('SELECT xp FROM users WHERE user_id = ?', (alvo.id,))
+        resultado = self.cursor.fetchone()
+        xp = resultado[0] if resultado else 0
+        nivel = self.calcular_nivel(xp)
+        xp_proximo = self.TABELA_NIVEIS.get(nivel + 1, 0)
+        progresso = xp - self.TABELA_NIVEIS[nivel]
+        necessario = xp_proximo - self.TABELA_NIVEIS[nivel] if nivel < 15 else 0
+
+        embed = discord.Embed(title=f"🏆 Nível {nivel} | {alvo.display_name}", color=0x00ff00)
+        embed.add_field(name="XP Total", value=f"`{xp}`", inline=True)
+        if nivel < 15:
+            embed.add_field(name="Próximo Nível", value=f"`{xp_proximo} XP`", inline=True)
+            embed.add_field(name="Progresso", value=f"`{progresso}/{necessario}` ({progresso/necessario:.0%})", inline=False)
+        else:
+            embed.add_field(name="🎯 Status", value="Nível Máximo Alcançado!", inline=True)
+        embed.set_thumbnail(url=alvo.display_avatar.url)
+
+        await ctx.send(embed=embed)
 
 class RankingView(discord.ui.View):
     def __init__(self, bot, page=1):
